@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">Scoot Transit</string>
+    <string name="tab_caltrain">Caltrain</string>
+    <string name="tab_wayfinding">Routes</string>
+    <string name="tab_bart">BART</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="northbound">Northbound</string>
+    <string name="southbound">Southbound</string>
+    <string name="all_upcoming">All upcoming</string>
+    <string name="search_station_hint">Search station</string>
+    <string name="from">From</string>
+    <string name="to">To</string>
+    <string name="depart_now">Depart now</string>
+    <string name="depart_at">Depart at\u2026</string>
+    <string name="arrive_by">Arrive by\u2026</string>
+    <string name="leave_by">Leave by</string>
+    <string name="home">Home</string>
+    <string name="work">Work</string>
+    <string name="current_location">Use current location</string>
+    <string name="loading">Loading\u2026</string>
+    <string name="schedule_only">Schedule only (live data unavailable)</string>
+    <string name="no_results">No results</string>
+    <string name="next_trains_widget">Next trains</string>
+
+    <string name="permission_location_rationale">Location is used to find your nearest stations and plan trips from where you are.</string>
+    <string name="permission_notifications_rationale">Notifications power service alerts and the last-train-of-night warning.</string>
+
+    <string name="error_no_511_key">Add your 511.org API key to local.properties to load live transit data.</string>
+    <string name="error_no_ors_key">Add your OpenRouteService API key to local.properties for scooter routing.</string>
+    <string name="error_no_google_key">Add your Google Maps API key to local.properties for maps and address search.</string>
+</resources>

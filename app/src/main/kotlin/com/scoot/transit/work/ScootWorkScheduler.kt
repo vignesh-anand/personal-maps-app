@@ -1,0 +1,56 @@
+package com.scoot.transit.work
+
+import android.content.Context
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.scoot.transit.domain.Agency
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Schedules background refreshes:
+ *  - GTFS static for Caltrain + BART weekly
+ *  - GTFS-RT alert poller every ~10 minutes
+ *  - Last-train-of-night daily check
+ */
+@Singleton
+class ScootWorkScheduler @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    fun scheduleAll() {
+        val wm = WorkManager.getInstance(context)
+        Agency.entries.filter { it == Agency.CALTRAIN || it == Agency.BART }.forEach { agency ->
+            val req = PeriodicWorkRequestBuilder<GtfsRefreshWorker>(7, TimeUnit.DAYS)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
+                .setInputData(GtfsRefreshWorker.input(agency))
+                .build()
+            wm.enqueueUniquePeriodicWork(
+                "gtfs_refresh_${agency.operatorId}",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                req,
+            )
+        }
+        val alertReq = PeriodicWorkRequestBuilder<AlertPollWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        wm.enqueueUniquePeriodicWork(
+            "alert_poll",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            alertReq,
+        )
+
+        val lastTrainReq = PeriodicWorkRequestBuilder<LastTrainWorker>(1, TimeUnit.HOURS)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        wm.enqueueUniquePeriodicWork(
+            "last_train_check",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            lastTrainReq,
+        )
+    }
+}
