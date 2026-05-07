@@ -224,21 +224,35 @@ private fun PairTab(state: BartState, vm: BartViewModel) {
 @Composable
 private fun StationSelector(label: String, stations: List<Station>, selected: String?, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val current = stations.firstOrNull { it.stopId == selected }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+    val initialName = stations.firstOrNull { it.stopId == selected }?.name ?: ""
+    var text by remember(selected) { mutableStateOf(initialName) }
+    val filtered = remember(text, stations) {
+        if (text.isBlank()) stations.take(20)
+        else stations.filter { it.name.contains(text, ignoreCase = true) }.take(20)
+    }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = current?.name ?: "",
-            onValueChange = {},
-            readOnly = true,
+            value = text,
+            onValueChange = {
+                text = it
+                expanded = true
+            },
             label = { Text(label) },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth().menuAnchor(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            stations.forEach { st ->
-                DropdownMenuItem(
-                    text = { Text(st.name) },
-                    onClick = { onSelect(st.stopId); expanded = false },
-                )
+        if (filtered.isNotEmpty()) {
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                filtered.forEach { st ->
+                    DropdownMenuItem(
+                        text = { Text(st.name) },
+                        onClick = {
+                            text = st.name
+                            onSelect(st.stopId)
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }

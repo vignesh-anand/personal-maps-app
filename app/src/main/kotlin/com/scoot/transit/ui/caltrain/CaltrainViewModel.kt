@@ -113,12 +113,15 @@ class CaltrainViewModel @Inject constructor(
         val displayedStations = (favStations + listOfNotNull(gpsStation)).distinctBy { it.stopId }.take(4)
         val cards = displayedStations.map { s -> buildCard(s) }
         val alerts = withContext(Dispatchers.IO) { realtime.serviceAlertsFor(Agency.CALTRAIN) }
+        val allStations = withContext(Dispatchers.IO) { statics.stationsForAgency(Agency.CALTRAIN) }
+            .sortedBy { it.name }
         _state.update {
             it.copy(
                 isLoading = false,
                 cards = cards,
                 gpsStationId = gpsStation?.stopId,
                 serviceAlerts = alerts,
+                allStations = allStations,
             )
         }
     }
@@ -157,6 +160,7 @@ data class CaltrainState(
     val pairLoading: Boolean = false,
     val pairResults: List<PairResult> = emptyList(),
     val serviceAlerts: List<ServiceAlert> = emptyList(),
+    val allStations: List<Station> = emptyList(),
 )
 
 data class StationCardData(

@@ -147,12 +147,21 @@ private fun DirectionBlock(label: String, departure: com.scoot.transit.domain.De
 private fun PairTripCard(state: CaltrainState, onPlan: (String, String) -> Unit) {
     var fromId by remember { mutableStateOf<String?>(null) }
     var toId by remember { mutableStateOf<String?>(null) }
-    val all = state.cards.map { it.station } + state.searchResults
-    val unique = all.distinctBy { it.stopId }
+    val pool = (state.cards.map { it.station } + state.allStations).distinctBy { it.stopId }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            DropdownStation(label = "From", stations = unique, selected = fromId) { fromId = it }
-            DropdownStation(label = "To", stations = unique, selected = toId) { toId = it }
+            StationTypeahead(
+                label = "From",
+                stations = pool,
+                selectedId = fromId,
+                onSelect = { fromId = it.stopId },
+            )
+            StationTypeahead(
+                label = "To",
+                stations = pool,
+                selectedId = toId,
+                onSelect = { toId = it.stopId },
+            )
             androidx.compose.material3.Button(
                 onClick = {
                     val f = fromId; val t = toId
@@ -174,28 +183,42 @@ private fun PairTripCard(state: CaltrainState, onPlan: (String, String) -> Unit)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DropdownStation(
+private fun StationTypeahead(
     label: String,
     stations: List<com.scoot.transit.domain.Station>,
-    selected: String?,
-    onSelect: (String) -> Unit,
+    selectedId: String?,
+    onSelect: (com.scoot.transit.domain.Station) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val current = stations.firstOrNull { it.stopId == selected }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+    val initialName = stations.firstOrNull { it.stopId == selectedId }?.name ?: ""
+    var text by remember(selectedId) { mutableStateOf(initialName) }
+    val filtered = remember(text, stations) {
+        if (text.isBlank()) stations.take(20)
+        else stations.filter { it.name.contains(text, ignoreCase = true) }.take(20)
+    }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = current?.name ?: "",
-            onValueChange = {},
-            readOnly = true,
+            value = text,
+            onValueChange = {
+                text = it
+                expanded = true
+            },
             label = { Text(label) },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth().menuAnchor(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            stations.forEach { st ->
-                DropdownMenuItem(
-                    text = { Text(st.name) },
-                    onClick = { onSelect(st.stopId); expanded = false },
-                )
+        if (filtered.isNotEmpty()) {
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                filtered.forEach { st ->
+                    DropdownMenuItem(
+                        text = { Text(st.name) },
+                        onClick = {
+                            text = st.name
+                            onSelect(st)
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }
