@@ -38,11 +38,18 @@ class StationDetailViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val station = withContext(Dispatchers.IO) { statics.stationById(agency, stopIdArg) }
-            _state.update { it.copy(station = station) }
+            val displayName = station?.let { displayName(it.name) } ?: "Station"
+            _state.update { it.copy(station = station, displayName = displayName) }
             loadAll()
             while (true) { delay(45_000); loadAll() }
         }
     }
+
+    /** Strips "Northbound/Southbound" platform suffix and "Caltrain Station" filler. */
+    private fun displayName(raw: String): String =
+        raw.replace(Regex("\\s*(Northbound|Southbound)$"), "")
+            .replace(Regex("\\s*Caltrain Station$"), "")
+            .trim()
 
     private suspend fun loadAll() {
         if (_state.value.station == null) return
@@ -56,6 +63,7 @@ class StationDetailViewModel @Inject constructor(
 
 data class StationDetailState(
     val station: Station? = null,
+    val displayName: String = "",
     val departures: List<Departure> = emptyList(),
     val isLoading: Boolean = true,
 )

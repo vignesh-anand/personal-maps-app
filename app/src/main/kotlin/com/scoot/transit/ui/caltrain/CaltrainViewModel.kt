@@ -16,7 +16,6 @@ import com.scoot.transit.domain.Direction
 import com.scoot.transit.domain.LatLng
 import com.scoot.transit.domain.Station
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import javax.inject.Inject

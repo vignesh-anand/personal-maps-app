@@ -8,8 +8,8 @@ import com.scoot.transit.domain.Agency
 import com.scoot.transit.domain.DataSource
 import com.scoot.transit.domain.Departure
 import com.scoot.transit.domain.Direction
+import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -37,24 +37,34 @@ class DepartureRepo @Inject constructor(
         limit: Int = 20,
     ): List<Departure> {
         val family = statics.stopFamily(agency, stopId)
-        val sameDay = family.flatMap {
-            upcomingForDate(agency, it, from.toLocalDate(), from.toLocalTime(), limit, isPrevDay = false)
-        }.distinctBy { it.tripId to it.stopId }
-        if (sameDay.size >= limit) {
-            return sameDay.sortedBy { it.scheduled }.take(limit)
-        }
+        val nowInstant = from.toInstant()
+        // Yesterday's service may still have post-midnight trips that depart "today" - check that first.
         val prevDay = from.toLocalDate().minusDays(1)
         val shifted = family.flatMap {
             upcomingForDate(
                 agency = agency,
                 stopId = it,
-                date = prevDay,
-                after = from.toLocalTime(),
-                limit = limit - sameDay.size,
+                serviceDate = prevDay,
+                afterInstant = nowInstant,
+                limit = limit,
                 isPrevDay = true,
             )
         }
-        return (sameDay + shifted).sortedBy { it.scheduled }.take(limit)
+        val sameDay = family.flatMap {
+            upcomingForDate(
+                agency = agency,
+                stopId = it,
+                serviceDate = from.toLocalDate(),
+                afterInstant = nowInstant,
+                limit = limit * 2,
+                isPrevDay = false,
+            )
+        }
+        return (shifted + sameDay)
+            .distinctBy { it.tripId to it.stopId }
+            .filter { it.scheduled.isAfter(nowInstant.minusSeconds(30)) }
+            .sortedBy { it.scheduled }
+            .take(limit)
     }
 
     suspend fun pairTrips(
@@ -65,6 +75,7 @@ class DepartureRepo @Inject constructor(
         limit: Int = 20,
     ): List<PairResult> {
         val date = from.toLocalDate()
+        val midnight = date.atStartOfDay(zone).toInstant()
         val secs = from.toLocalTime().toSecondOfDay()
         val active = calendar.activeServiceIds(agency.operatorId, dateFmt.format(date), date.dayOfWeek.value).toHashSet()
         val rows = stopTimes.pairTrips(agency.operatorId, fromStopId, toStopId, secs, limit * 4)
@@ -74,8 +85,8 @@ class DepartureRepo @Inject constructor(
             .map { row ->
                 val depUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, fromStopId)]
                 val arrUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, toStopId)]
-                val schedDep = LocalTime.ofSecondOfDay(((row.departure_seconds % 86_400) + 86_400) % 86_400.toLong())
-                val schedArr = LocalTime.ofSecondOfDay(((row.to_arrival_seconds % 86_400) + 86_400) % 86_400.toLong())
+                val schedDep = midnight.plusSeconds(row.departure_seconds.toLong())
+                val schedArr = midnight.plusSeconds(row.to_arrival_seconds.toLong())
                 PairResult(
                     agency = agency,
                     tripId = row.trip_id,
@@ -98,19 +109,22 @@ class DepartureRepo @Inject constructor(
     private suspend fun upcomingForDate(
         agency: Agency,
         stopId: String,
-        date: LocalDate,
-        after: LocalTime,
+        serviceDate: LocalDate,
+        afterInstant: Instant,
         limit: Int,
         isPrevDay: Boolean,
     ): List<Departure> {
-        val active = calendar.activeServiceIds(agency.operatorId, dateFmt.format(date), date.dayOfWeek.value).toHashSet()
+        val active = calendar.activeServiceIds(agency.operatorId, dateFmt.format(serviceDate), serviceDate.dayOfWeek.value).toHashSet()
         if (active.isEmpty()) return emptyList()
-        val afterSecs = if (isPrevDay) after.toSecondOfDay() + 86_400 else after.toSecondOfDay()
-        val rows = stopTimes.departuresFromStop(agency.operatorId, stopId, afterSecs, limit * 4)
+        // Lower bound for the SQL filter: how many seconds after midnight of the service date does
+        // `afterInstant` correspond to? (negative if afterInstant is before that midnight.)
+        val serviceMidnight = serviceDate.atStartOfDay(zone).toInstant()
+        val secondsSinceServiceMidnight = (afterInstant.epochSecond - serviceMidnight.epochSecond).toInt().coerceAtLeast(0)
+        val rows = stopTimes.departuresFromStop(agency.operatorId, stopId, secondsSinceServiceMidnight, limit * 4)
         val updates = realtime.tripUpdatesFor(agency)
         return rows.asSequence()
             .filter { it.service_id in active }
-            .map { it.toDomain(agency, updates) }
+            .map { it.toDomain(agency, updates, serviceDate, zone) }
             .take(limit)
             .toList()
     }
@@ -126,18 +140,20 @@ data class PairResult(
     val headsign: String?,
     val fromStopId: String,
     val toStopId: String,
-    val scheduledDeparture: LocalTime,
-    val scheduledArrival: LocalTime,
-    val realtimeDeparture: java.time.Instant?,
-    val realtimeArrival: java.time.Instant?,
+    val scheduledDeparture: Instant,
+    val scheduledArrival: Instant,
+    val realtimeDeparture: Instant?,
+    val realtimeArrival: Instant?,
     val cancelled: Boolean,
 )
 
 private fun DepartureRow.toDomain(
     agency: Agency,
     updates: Map<com.scoot.transit.data.TripStopKey, com.scoot.transit.data.StopUpdate>,
+    serviceDate: LocalDate,
+    zone: ZoneId,
 ): Departure {
-    val scheduled = LocalTime.ofSecondOfDay(((departure_seconds % 86_400) + 86_400) % 86_400.toLong())
+    val scheduledInstant = serviceDate.atStartOfDay(zone).toInstant().plusSeconds(departure_seconds.toLong())
     val update = updates[com.scoot.transit.data.TripStopKey(trip_id, stop_id)]
     return Departure(
         agency = agency,
@@ -148,7 +164,7 @@ private fun DepartureRow.toDomain(
         routeLongName = route_long_name,
         direction = Direction.fromGtfs(direction_id),
         headsign = headsign,
-        scheduled = scheduled,
+        scheduled = scheduledInstant,
         realtime = update?.departure,
         delaySeconds = update?.delaySeconds,
         cancelled = update?.cancelled == true,

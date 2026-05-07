@@ -26,6 +26,7 @@ import com.scoot.transit.ui.bart.BartScreen
 import com.scoot.transit.ui.caltrain.CaltrainScreen
 import com.scoot.transit.ui.caltrain.StationDetailScreen
 import com.scoot.transit.ui.settings.SettingsScreen
+import com.scoot.transit.ui.trip.TripDetailScreen
 import com.scoot.transit.ui.wayfinding.WayfindingScreen
 
 private sealed class Tab(val route: String, val labelRes: Int, val icon: ImageVector) {
@@ -90,7 +91,30 @@ fun ScootApp(deepLinkIntent: Intent? = null) {
             ) { entry ->
                 val agency = entry.arguments?.getString("agency") ?: "CT"
                 val stopId = entry.arguments?.getString("stopId") ?: ""
-                StationDetailScreen(agency = agency, stopId = stopId, onBack = { nav.popBackStack() })
+                StationDetailScreen(
+                    agency = agency,
+                    stopId = stopId,
+                    onBack = { nav.popBackStack() },
+                    onTripClick = { tripId -> nav.navigate("trip/$agency/$tripId/$stopId") },
+                )
+            }
+            composable(
+                "trip/{agency}/{tripId}/{focusStopId}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("agency") { type = androidx.navigation.NavType.StringType },
+                    androidx.navigation.navArgument("tripId") { type = androidx.navigation.NavType.StringType },
+                    androidx.navigation.navArgument("focusStopId") { type = androidx.navigation.NavType.StringType },
+                )
+            ) { entry ->
+                val agency = entry.arguments?.getString("agency") ?: "CT"
+                val tripId = entry.arguments?.getString("tripId") ?: ""
+                val focusStopId = entry.arguments?.getString("focusStopId") ?: ""
+                TripDetailScreen(
+                    agency = agency,
+                    tripId = tripId,
+                    focusStopId = focusStopId,
+                    onBack = { nav.popBackStack() },
+                )
             }
         }
     }

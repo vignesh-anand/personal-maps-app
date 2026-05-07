@@ -55,13 +55,11 @@ class LastTrainWorker @AssistedInject constructor(
             val deps = departures.upcomingDepartures(Agency.CALTRAIN, station.stopId, now, limit = 50)
             val today = now.toLocalDate()
             val lastToday = deps.lastOrNull { dep ->
-                val instant = dep.realtime
-                    ?: ZonedDateTime.of(today, dep.scheduled, now.zone).toInstant()
+                val instant = dep.realtime ?: dep.scheduled
                 ZonedDateTime.ofInstant(instant, now.zone).toLocalDate() == today
             } ?: continue
 
-            val depInstant = lastToday.realtime
-                ?: ZonedDateTime.of(today, lastToday.scheduled, now.zone).toInstant()
+            val depInstant = lastToday.realtime ?: lastToday.scheduled
             val scootLeg = routing.scootLeg(origin, station.location) ?: continue
             val leaveBy = depInstant.minusSeconds(scootLeg.durationSeconds.toLong())
             val minutesUntilLeave = Duration.between(Instant.now(), leaveBy).toMinutes()

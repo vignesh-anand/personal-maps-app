@@ -112,7 +112,7 @@ private fun StationCard(data: StationCardData, isGps: Boolean, onClick: () -> Un
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(data.station.name, style = MaterialTheme.typography.titleLarge)
+                Text(cleanStationName(data.station.name), style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.width(8.dp))
                 if (isGps) {
                     Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
@@ -220,7 +220,9 @@ private fun PairResultRow(r: com.scoot.transit.data.PairResult) {
                     source = if (depTime != null) com.scoot.transit.domain.DataSource.GTFS_RT else com.scoot.transit.domain.DataSource.SCHEDULE,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("→ ${r.scheduledArrival}", style = MaterialTheme.typography.bodySmall)
+                val arrFmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+                    .withZone(java.time.ZoneId.of("America/Los_Angeles"))
+                Text("→ ${arrFmt.format(r.realtimeArrival ?: r.scheduledArrival)}", style = MaterialTheme.typography.bodySmall)
             }
             r.headsign?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
@@ -229,3 +231,8 @@ private fun PairResultRow(r: com.scoot.transit.data.PairResult) {
 
 @Composable
 private fun stringResLocal(id: Int): String = androidx.compose.ui.res.stringResource(id = id)
+
+private fun cleanStationName(raw: String): String =
+    raw.replace(Regex("\\s*(Northbound|Southbound)$"), "")
+        .replace(Regex("\\s*Caltrain Station$"), "")
+        .trim()

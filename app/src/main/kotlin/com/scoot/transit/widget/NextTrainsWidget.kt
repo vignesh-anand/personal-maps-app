@@ -134,13 +134,11 @@ private fun DirRow(label: String, dep: Departure?) {
 private fun etaText(dep: Departure?): String {
     if (dep == null) return "--"
     val zone = ZoneId.of("America/Los_Angeles")
-    val instant = dep.realtime ?: ZonedDateTime.of(
-        java.time.LocalDate.now(zone), dep.scheduled, zone
-    ).toInstant()
+    val instant = dep.realtime ?: dep.scheduled
     val mins = Duration.between(Instant.now(), instant).toMinutes()
     return when {
         mins <= 0 -> "Now"
         mins < 60 -> "${mins}m"
-        else -> dep.scheduled.toString().take(5)
+        else -> java.time.format.DateTimeFormatter.ofPattern("h:mm a").withZone(zone).format(instant)
     }
 }

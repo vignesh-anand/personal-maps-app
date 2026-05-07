@@ -1,7 +1,6 @@
 package com.scoot.transit.domain
 
 import java.time.Instant
-import java.time.LocalTime
 
 data class LatLng(val lat: Double, val lng: Double)
 
@@ -31,7 +30,7 @@ data class Departure(
     val routeLongName: String?,
     val direction: Direction,
     val headsign: String?,
-    val scheduled: LocalTime,
+    val scheduled: Instant,
     val realtime: Instant?,
     val delaySeconds: Int? = null,
     val cancelled: Boolean = false,

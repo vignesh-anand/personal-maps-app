@@ -208,7 +208,11 @@ private fun PairTab(state: BartState, vm: BartViewModel) {
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("${r.routeShortName ?: r.routeLongName ?: r.tripId}", style = MaterialTheme.typography.titleMedium)
-                    Text("Depart ${r.scheduledDeparture} → arrive ${r.scheduledArrival}", style = MaterialTheme.typography.bodyMedium)
+                    val fmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+                        .withZone(java.time.ZoneId.of("America/Los_Angeles"))
+                    val dep = r.realtimeDeparture ?: r.scheduledDeparture
+                    val arr = r.realtimeArrival ?: r.scheduledArrival
+                    Text("Depart ${fmt.format(dep)} → arrive ${fmt.format(arr)}", style = MaterialTheme.typography.bodyMedium)
                     r.headsign?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 }
             }

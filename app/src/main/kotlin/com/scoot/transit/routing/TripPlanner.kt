@@ -18,8 +18,6 @@ import com.scoot.transit.domain.TripLeg
 import com.scoot.transit.domain.TripPlan
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -157,8 +155,8 @@ class TripPlanner @Inject constructor(
         val results = mutableListOf<TripPlan>()
         for (pair in pairs) {
             if (pair.cancelled) continue
-            val depTime = pair.computeInstant(pair.realtimeDeparture, pair.scheduledDeparture, basis.toLocalDate())
-            val arrTime = pair.computeInstant(pair.realtimeArrival, pair.scheduledArrival, basis.toLocalDate())
+            val depTime = pair.realtimeDeparture ?: pair.scheduledDeparture
+            val arrTime = pair.realtimeArrival ?: pair.scheduledArrival
             if (timing is TripTiming.ArriveBy && arrTime.plusSeconds(egressSeconds).isAfter(timing.by)) continue
             if (timing is TripTiming.DepartAt) {
                 val earliestBoard = timing.at.plusSeconds(accessSeconds)
@@ -223,15 +221,6 @@ class TripPlanner @Inject constructor(
         if (zdt.dayOfWeek.value >= 6) return ScooterOnTransitRule.OK
         val hour = zdt.hour
         return if (hour in 7..8 || hour in 16..18) ScooterOnTransitRule.PEAK_RESTRICTED else ScooterOnTransitRule.OK
-    }
-
-    private fun PairResult.computeInstant(
-        realtime: Instant?,
-        scheduledLocalTime: LocalTime,
-        date: LocalDate,
-    ): Instant {
-        if (realtime != null) return realtime
-        return ZonedDateTime.of(date, scheduledLocalTime, zone).toInstant()
     }
 
     private fun TripPlan.signature(): String = legs.joinToString("|") { leg ->

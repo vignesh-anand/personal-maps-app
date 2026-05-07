@@ -51,19 +51,24 @@ fun LiveBadge(source: DataSource, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MinutesPill(eta: Instant?, scheduled: java.time.LocalTime?, source: DataSource) {
+fun MinutesPill(eta: Instant?, scheduled: Instant?, source: DataSource) {
     val now = Instant.now()
-    val showInstant = eta ?: scheduled?.let {
-        val today = java.time.LocalDate.now(ZoneId.of("America/Los_Angeles"))
-        java.time.ZonedDateTime.of(today, it, ZoneId.of("America/Los_Angeles")).toInstant()
-    }
-    val mins = showInstant?.let { Duration.between(now, it).toMinutes() }
+    val showInstant = eta ?: scheduled
+    val secs = showInstant?.let { Duration.between(now, it).seconds }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         when {
-            mins == null -> Text("--", style = MaterialTheme.typography.titleMedium)
-            mins <= 0 -> Text("Now", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
-            mins < 60 -> Text("${mins}m", style = MaterialTheme.typography.titleMedium)
+            secs == null -> Text("--", style = MaterialTheme.typography.titleMedium)
+            secs < -60 -> {
+                val fmt = DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneId.of("America/Los_Angeles"))
+                Text(
+                    fmt.format(showInstant),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+            secs <= 60 -> Text("Now", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
+            secs < 60 * 60 -> Text("${secs / 60}m", style = MaterialTheme.typography.titleMedium)
             else -> {
                 val fmt = DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneId.of("America/Los_Angeles"))
                 Text(fmt.format(showInstant), style = MaterialTheme.typography.titleMedium)
@@ -108,8 +113,4 @@ fun ErrorBanner(message: String) {
     }
 }
 
-fun Departure.bestInstant(): Instant? {
-    if (realtime != null) return realtime
-    val today = java.time.LocalDate.now(ZoneId.of("America/Los_Angeles"))
-    return java.time.ZonedDateTime.of(today, scheduled, ZoneId.of("America/Los_Angeles")).toInstant()
-}
+fun Departure.bestInstant(): Instant = realtime ?: scheduled
