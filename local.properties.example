@@ -8,13 +8,14 @@ sdk.dir=/home/your-user/Android/Sdk
 # Register at https://511.org/open-data/token
 SCOOT_511_API_KEY=YOUR_511_KEY_HERE
 
-# OpenRouteService API key
-# Register at https://openrouteservice.org/dev/#/signup (free 2000 req/day)
-SCOOT_ORS_API_KEY=YOUR_ORS_KEY_HERE
-
 # BART legacy ETD API key (public default works for personal use)
 SCOOT_BART_API_KEY=MW9S-E7SL-26DU-VV8V
 
-# Google Maps Platform API key (Maps SDK + Places + Geocoding)
+# Google Maps Platform API key
+# Enable: Maps SDK for Android, Places API (New), Geocoding API, Directions API
 # Create at https://console.cloud.google.com -> APIs & Services -> Credentials
 SCOOT_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_KEY_HERE
+
+# OpenRouteService is no longer used for routing (Google Directions handles it).
+# Left here for reference / fallback if you ever want to swap back.
+#SCOOT_ORS_API_KEY=

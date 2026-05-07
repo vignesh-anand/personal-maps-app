@@ -3,6 +3,7 @@ package com.scoot.transit.di
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.scoot.transit.BuildConfig
 import com.scoot.transit.data.remote.BartEtdApi
+import com.scoot.transit.data.remote.GoogleDirectionsApi
 import com.scoot.transit.data.remote.OpenRouteServiceApi
 import com.scoot.transit.data.remote.SiriStopMonitoringApi
 import com.scoot.transit.data.remote.TransitFeedApi
@@ -22,6 +23,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 @Qualifier annotation class FiveOneOne
 @Qualifier annotation class Bart
 @Qualifier annotation class Ors
+@Qualifier annotation class Google
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -70,6 +72,14 @@ object NetworkModule {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
 
+    @Provides @Singleton @Google
+    fun retrofitGoogle(client: OkHttpClient, json: Json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://maps.googleapis.com/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
     @Provides
     fun transitFeedApi(@FiveOneOne r: Retrofit): TransitFeedApi = r.create(TransitFeedApi::class.java)
 
@@ -81,4 +91,7 @@ object NetworkModule {
 
     @Provides
     fun orsApi(@Ors r: Retrofit): OpenRouteServiceApi = r.create(OpenRouteServiceApi::class.java)
+
+    @Provides
+    fun googleDirectionsApi(@Google r: Retrofit): GoogleDirectionsApi = r.create(GoogleDirectionsApi::class.java)
 }

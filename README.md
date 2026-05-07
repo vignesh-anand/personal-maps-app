@@ -28,31 +28,33 @@ up to ~15 miles to the best station for the trip and treats that as the access/e
   - **511.org Open Data** for GTFS static + GTFS-RT (TripUpdates / VehiclePositions /
     ServiceAlerts) and SIRI StopMonitoring for buses.
   - **api.bart.gov ETD** as a backup live-ETA source for BART.
-  - **OpenRouteService** (`cycling-electric` profile) for scooter street routing.
-  - **Google Maps Platform** for tiles, Places Autocomplete, and Geocoding.
-- Local SQLite (Room) caches Caltrain + BART static GTFS, scoot-leg ORS responses, favorites,
-  presets, and user prefs.
+  - **Google Maps Platform** for tiles, Places Autocomplete, Geocoding, *and* scooter street
+    routing (Directions API in `bicycling` mode with a small speed-up factor applied).
+- Local SQLite (Room) caches Caltrain + BART static GTFS, scoot-leg Directions responses,
+  favorites, presets, and user prefs.
 - `WorkManager` refreshes static GTFS weekly, polls service alerts every 15 min, and runs the
   last-train check hourly in the evening.
 - The multimodal planner is a hand-rolled candidate-station enumeration: pick K nearest
-  stations to origin and dest within scooter range, ask ORS for the access/egress legs, look up
-  matching trips in the local DB, merge GTFS-RT, and rank by total duration.
+  stations to origin and dest within scooter range, ask Google Directions for the access/egress
+  legs, look up matching trips in the local DB, merge GTFS-RT, and rank by total duration.
 
 ## Setup
 
-You need to register for a few free API keys:
+You need two free API keys:
 
 1. **511.org Bay Area Open Data** - https://511.org/open-data/token (free, instant)
-2. **OpenRouteService** - https://openrouteservice.org/dev/#/signup (free, 2,000 req/day)
-3. **Google Maps Platform** - https://console.cloud.google.com - enable Maps SDK for Android,
-   Places API, and Geocoding API. Restrict the key to your debug + release SHA-1.
+2. **Google Maps Platform** - https://console.cloud.google.com. Create a project, then enable:
+   **Maps SDK for Android**, **Places API (New)**, **Geocoding API**, and **Directions API**.
+   Add a billing account (no charge for personal use). Restrict the key to your debug +
+   release SHA-1 once the app is running.
+
+(BART uses a public legacy default key so no signup is needed there.)
 
 Then copy `local.properties.example` to `local.properties` and fill in:
 
 ```properties
 sdk.dir=/path/to/Android/Sdk
 SCOOT_511_API_KEY=...
-SCOOT_ORS_API_KEY=...
 SCOOT_BART_API_KEY=MW9S-E7SL-26DU-VV8V
 SCOOT_GOOGLE_MAPS_API_KEY=...
 ```
@@ -94,8 +96,8 @@ app/src/main/kotlin/com/scoot/transit/
 - Bus routing is intentionally minimal in v1 - the SIRI fallback gives "next departures at a
   bus stop" but doesn't do full multimodal bus + train planning. Add bus GTFS via 511 if you
   need richer bus routing.
-- The 2k/day OpenRouteService limit applies per API key. If you hit it, the app gracefully
-  falls back to a haversine-based estimate.
+- Google Directions usage is well within the $200/mo free tier for personal use, but if you ever
+  hit the quota the app gracefully falls back to a haversine-based estimate.
 - Caltrain GTFS-RT can be flaky; when it is, station cards show "schedule only" and live
   badges go gray.
 - The escooter range model is single-value for v1 (default 15 mi); add a current-battery input

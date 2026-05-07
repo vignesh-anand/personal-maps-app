@@ -72,7 +72,6 @@ class SettingsViewModel @Inject constructor(
                 caltrainLastRefresh = ctLastRefresh,
                 bartLastRefresh = baLastRefresh,
                 hasFiveOneOneKey = BuildConfig.API_511_KEY.isNotBlank(),
-                hasOrsKey = BuildConfig.API_ORS_KEY.isNotBlank(),
                 hasGoogleKey = BuildConfig.API_GOOGLE_KEY.isNotBlank(),
             )
         }
@@ -161,7 +160,6 @@ data class SettingsState(
     val caltrainLastRefresh: Long? = null,
     val bartLastRefresh: Long? = null,
     val hasFiveOneOneKey: Boolean = false,
-    val hasOrsKey: Boolean = false,
     val hasGoogleKey: Boolean = false,
     val placeQuery: String = "",
     val placeResults: List<PlacesRepo.PlaceSuggestion> = emptyList(),

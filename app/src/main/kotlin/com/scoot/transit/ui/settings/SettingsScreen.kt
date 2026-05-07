@@ -72,10 +72,9 @@ private fun ApiKeyStatus(s: SettingsState) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("API keys", style = MaterialTheme.typography.titleMedium)
             KeyRow("511.org", s.hasFiveOneOneKey)
-            KeyRow("OpenRouteService", s.hasOrsKey)
-            KeyRow("Google Maps + Places", s.hasGoogleKey)
+            KeyRow("Google (Maps + Places + Directions)", s.hasGoogleKey)
             Text(
-                "Set in local.properties as SCOOT_511_API_KEY, SCOOT_ORS_API_KEY, SCOOT_GOOGLE_MAPS_API_KEY. Rebuild to apply.",
+                "Set in local.properties as SCOOT_511_API_KEY and SCOOT_GOOGLE_MAPS_API_KEY. Rebuild to apply.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
