@@ -78,13 +78,29 @@ class DepartureRepo @Inject constructor(
         val midnight = date.atStartOfDay(zone).toInstant()
         val secs = from.toLocalTime().toSecondOfDay()
         val active = calendar.activeServiceIds(agency.operatorId, dateFmt.format(date), date.dayOfWeek.value).toHashSet()
-        val rows = stopTimes.pairTrips(agency.operatorId, fromStopId, toStopId, secs, limit * 4)
         val updates = realtime.tripUpdatesFor(agency)
-        return rows.filter { it.service_id in active }
+        // Expand parent station ids to all platform stop ids and run the pair query for every
+        // valid (from-platform, to-platform) combination. Most combos return zero rows; the
+        // ones that share a direction yield the trips we want.
+        val fromPlatforms = statics.stopFamily(agency, fromStopId)
+        val toPlatforms = statics.stopFamily(agency, toStopId)
+        val rows = mutableListOf<Pair<com.scoot.transit.data.db.PairTripRow, Pair<String, String>>>()
+        for (f in fromPlatforms) {
+            for (t in toPlatforms) {
+                if (f == t) continue
+                stopTimes.pairTrips(agency.operatorId, f, t, secs, limit * 4)
+                    .forEach { rows += it to (f to t) }
+            }
+        }
+        return rows.asSequence()
+            .filter { (row, _) -> row.service_id in active }
+            .distinctBy { (row, _) -> row.trip_id }
+            .sortedBy { (row, _) -> row.departure_seconds }
             .take(limit)
-            .map { row ->
-                val depUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, fromStopId)]
-                val arrUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, toStopId)]
+            .map { (row, ft) ->
+                val (f, t) = ft
+                val depUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, f)]
+                val arrUpdate = updates[com.scoot.transit.data.TripStopKey(row.trip_id, t)]
                 val schedDep = midnight.plusSeconds(row.departure_seconds.toLong())
                 val schedArr = midnight.plusSeconds(row.to_arrival_seconds.toLong())
                 PairResult(
@@ -95,8 +111,8 @@ class DepartureRepo @Inject constructor(
                     routeLongName = row.route_long_name,
                     direction = Direction.fromGtfs(row.direction_id),
                     headsign = row.headsign,
-                    fromStopId = fromStopId,
-                    toStopId = toStopId,
+                    fromStopId = f,
+                    toStopId = t,
                     scheduledDeparture = schedDep,
                     scheduledArrival = schedArr,
                     realtimeDeparture = depUpdate?.departure,
@@ -104,6 +120,7 @@ class DepartureRepo @Inject constructor(
                     cancelled = depUpdate?.cancelled == true || arrUpdate?.cancelled == true,
                 )
             }
+            .toList()
     }
 
     private suspend fun upcomingForDate(
