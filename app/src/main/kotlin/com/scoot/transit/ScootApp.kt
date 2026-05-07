@@ -6,9 +6,15 @@ import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.google.android.libraries.places.api.Places
+import com.scoot.transit.data.GtfsStaticRepo
+import com.scoot.transit.domain.Agency
 import com.scoot.transit.work.ScootWorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @HiltAndroidApp
@@ -16,6 +22,9 @@ class ScootApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var workScheduler: ScootWorkScheduler
+    @Inject lateinit var gtfsRepo: GtfsStaticRepo
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -33,6 +42,15 @@ class ScootApp : Application(), Configuration.Provider {
 
         createNotificationChannels()
         workScheduler.scheduleAll()
+
+        appScope.launch {
+            for (agency in listOf(Agency.CALTRAIN, Agency.BART)) {
+                if (!gtfsRepo.isLoaded(agency)) {
+                    Timber.i("No GTFS data for %s on first launch - kicking off one-time fetch", agency)
+                    workScheduler.refreshGtfsNow(agency)
+                }
+            }
+        }
     }
 
     private fun createNotificationChannels() {

@@ -11,6 +11,7 @@ import com.scoot.transit.data.UserPrefsRepo
 import com.scoot.transit.data.db.FavoriteEntity
 import com.scoot.transit.data.db.FavoritesDao
 import com.scoot.transit.domain.Agency
+import com.scoot.transit.work.ScootWorkScheduler
 import com.scoot.transit.domain.LatLng
 import com.scoot.transit.domain.Station
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +31,7 @@ class SettingsViewModel @Inject constructor(
     private val location: LocationRepo,
     private val favorites: FavoritesDao,
     private val places: PlacesRepo,
+    private val workScheduler: ScootWorkScheduler,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
@@ -134,6 +136,11 @@ class SettingsViewModel @Inject constructor(
             favorites.add(FavoriteEntity(agency.operatorId, stopId, sort_order = 99))
             refresh()
         }
+    }
+
+    fun refreshGtfsNow() {
+        workScheduler.refreshGtfsNow(Agency.CALTRAIN)
+        workScheduler.refreshGtfsNow(Agency.BART)
     }
 
     fun searchStation(agency: Agency, q: String) {

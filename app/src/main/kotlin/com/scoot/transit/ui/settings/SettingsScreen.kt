@@ -57,7 +57,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { ApiKeyStatus(state) }
-            item { GtfsStatus(state) }
+            item { GtfsStatus(state, vm) }
             item { PlacesSection(state, vm) }
             item { RangeSection(state, vm) }
             item { NotificationsSection(state, vm) }
@@ -93,17 +93,20 @@ private fun KeyRow(label: String, present: Boolean) {
 }
 
 @Composable
-private fun GtfsStatus(s: SettingsState) {
+private fun GtfsStatus(s: SettingsState, vm: SettingsViewModel) {
     Card {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("GTFS data", style = MaterialTheme.typography.titleMedium)
             GtfsRow("Caltrain", s.caltrainLoaded, s.caltrainLastRefresh)
             GtfsRow("BART", s.bartLoaded, s.bartLastRefresh)
             Text(
-                "Refreshes weekly via WorkManager when on Wi-Fi.",
+                "Auto-refreshes weekly on Wi-Fi. Tap below to fetch now.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
+            Button(onClick = { vm.refreshGtfsNow() }, modifier = Modifier.fillMaxWidth()) {
+                Text("Refresh schedules now")
+            }
         }
     }
 }

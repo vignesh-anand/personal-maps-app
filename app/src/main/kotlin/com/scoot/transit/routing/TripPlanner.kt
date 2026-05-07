@@ -81,7 +81,9 @@ class TripPlanner @Inject constructor(
 
                     val pairOptions = pairOptionsFor(agency, access, egress, accessLeg, egressLeg, timing, basis)
                     for (option in pairOptions.take(2)) {
-                        if ((agency to option.routeId) in disruptedRoutes) {
+                        val transit = option.legs.firstOrNull { it is TripLeg.Transit } as? TripLeg.Transit
+                        val routeKey = transit?.let { agency to (it.routeShortName ?: it.routeLongName ?: it.tripId) }
+                        if (routeKey != null && routeKey in disruptedRoutes) {
                             plans += option.copy(notes = option.notes + "Possible disruption on this route - check service alerts")
                         } else {
                             plans += option

@@ -3,7 +3,9 @@ package com.scoot.transit.work
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.scoot.transit.domain.Agency
@@ -51,6 +53,23 @@ class ScootWorkScheduler @Inject constructor(
             "last_train_check",
             ExistingPeriodicWorkPolicy.UPDATE,
             lastTrainReq,
+        )
+    }
+
+    /**
+     * Enqueues a one-time GTFS download for the given agency. Allows any network type so it can
+     * run on cellular when the user explicitly asks for fresh data (e.g. first launch / Settings
+     * pull-to-refresh button).
+     */
+    fun refreshGtfsNow(agency: Agency) {
+        val req = OneTimeWorkRequestBuilder<GtfsRefreshWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setInputData(GtfsRefreshWorker.input(agency))
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "gtfs_refresh_now_${agency.operatorId}",
+            ExistingWorkPolicy.KEEP,
+            req,
         )
     }
 }
