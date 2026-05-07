@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val DEFAULT_FAVS = listOf("70171", "70191", "70211") // Palo Alto, California Ave, San Antonio Caltrain stop_ids
+private val DEFAULT_FAVS = listOf("palo_alto", "california_ave", "san_antonio")
 
 @HiltViewModel
 class CaltrainViewModel @Inject constructor(
@@ -76,6 +76,25 @@ class CaltrainViewModel @Inject constructor(
         if (existing.isEmpty()) {
             DEFAULT_FAVS.forEachIndexed { idx, id ->
                 favorites.add(FavoriteEntity(Agency.CALTRAIN.operatorId, id, idx))
+            }
+            return
+        }
+        // Migrate any legacy platform-level favorite to its parent station id.
+        val migrated = mutableListOf<FavoriteEntity>()
+        var changed = false
+        for (entity in existing) {
+            val canonical = statics.stationById(Agency.CALTRAIN, entity.stop_id)?.stopId ?: entity.stop_id
+            if (canonical == entity.stop_id) {
+                migrated += entity
+            } else {
+                changed = true
+                migrated += entity.copy(stop_id = canonical)
+            }
+        }
+        if (changed) {
+            existing.forEach { favorites.remove(it.agency, it.stop_id) }
+            migrated.distinctBy { it.stop_id }.forEachIndexed { idx, e ->
+                favorites.add(FavoriteEntity(e.agency, e.stop_id, idx))
             }
         }
     }

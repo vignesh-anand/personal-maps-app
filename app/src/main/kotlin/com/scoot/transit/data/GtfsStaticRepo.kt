@@ -71,11 +71,19 @@ class GtfsStaticRepo @Inject constructor(
         prefs.getString(prefsKeyLastRefresh(agency))?.toLongOrNull()
 
     suspend fun stationsForAgency(agency: Agency): List<Station> =
-        stops.forAgency(agency.operatorId).filter { it.location_type == 0 || it.location_type == 1 }
-            .map { it.toDomain(agency) }
+        stops.forAgency(agency.operatorId).asCanonical(agency)
 
-    suspend fun stationById(agency: Agency, stopId: String): Station? =
-        stops.byId(agency.operatorId, stopId)?.toDomain(agency)
+    /**
+     * Returns the canonical (logical) station for any stop id. Promotes a directional/platform
+     * child stop to its parent station so the UI never exposes "...Northbound" / "...Southbound"
+     * platform-level pseudo-stations.
+     */
+    suspend fun stationById(agency: Agency, stopId: String): Station? {
+        val self = stops.byId(agency.operatorId, stopId) ?: return null
+        val parent = self.parent_station?.takeIf { it.isNotBlank() }
+            ?.let { stops.byId(agency.operatorId, it) }
+        return (parent ?: self).toDomain(agency)
+    }
 
     /**
      * For a given stop, return every stop_id that belongs to the same logical station
@@ -92,16 +100,13 @@ class GtfsStaticRepo @Inject constructor(
     suspend fun searchStations(agency: Agency, query: String): List<Station> {
         if (query.isBlank()) return stationsForAgency(agency).take(25)
         val q = "%${query.trim()}%"
-        return stops.searchByName(agency.operatorId, q)
-            .filter { it.location_type == 0 || it.location_type == 1 }
-            .map { it.toDomain(agency) }
+        return stops.searchByName(agency.operatorId, q).asCanonical(agency)
     }
 
     suspend fun nearestStation(agency: Agency, location: LatLng): Station? {
         val box = boundingBox(location, milesRadius = 25.0)
         return stops.nearby(agency.operatorId, box.minLat, box.maxLat, box.minLng, box.maxLng)
-            .filter { it.location_type == 0 || it.location_type == 1 }
-            .map { it.toDomain(agency) }
+            .asCanonical(agency)
             .minByOrNull { Geo.distanceMiles(it.location, location) }
     }
 
@@ -111,17 +116,46 @@ class GtfsStaticRepo @Inject constructor(
             stops.nearbyAllAgencies(box.minLat, box.maxLat, box.minLng, box.maxLng)
         else
             stops.nearby(agency.operatorId, box.minLat, box.maxLat, box.minLng, box.maxLng)
-        return candidates.filter { it.location_type == 0 || it.location_type == 1 }
-            .map { entity ->
-                val stationAgency = Agency.fromOperatorId(entity.agency) ?: agency ?: return@map null
-                val st = entity.toDomain(stationAgency)
-                st to Geo.distanceMiles(st.location, location)
-            }
-            .filterNotNull()
+        // Promote children to parent stations and dedupe per agency before scoring.
+        val canonical = candidates.groupBy { it.agency }.flatMap { (op, list) ->
+            val ag = Agency.fromOperatorId(op) ?: agency ?: return@flatMap emptyList()
+            list.asCanonical(ag)
+        }
+        return canonical
+            .map { it to Geo.distanceMiles(it.location, location) }
             .filter { it.second <= miles }
             .sortedBy { it.second }
             .take(limit)
             .map { it.first }
+    }
+
+    /**
+     * Promote a list of raw stops to canonical stations: parent stations are kept as-is, child
+     * stops are replaced by their parents (one entry per parent), and standalone stops with no
+     * parent are kept. Entrances/exits (location_type=2+) are dropped.
+     */
+    private suspend fun List<com.scoot.transit.data.db.StopEntity>.asCanonical(agency: Agency): List<Station> {
+        val parentIds = mutableSetOf<String>()
+        val out = mutableListOf<Station>()
+        for (s in this) {
+            when (s.location_type) {
+                1 -> {
+                    if (parentIds.add(s.stop_id)) out += s.toDomain(agency)
+                }
+                0 -> {
+                    val parentId = s.parent_station?.takeIf { it.isNotBlank() }
+                    if (parentId == null) {
+                        if (parentIds.add(s.stop_id)) out += s.toDomain(agency)
+                    } else if (parentIds.add(parentId)) {
+                        val parent = stops.byId(agency.operatorId, parentId)
+                        if (parent != null) out += parent.toDomain(agency)
+                        else out += s.toDomain(agency)
+                    }
+                }
+                else -> Unit
+            }
+        }
+        return out
     }
 
     /** Active service ids for the given local date. Splits after-midnight trips by checking previous day. */
@@ -133,9 +167,6 @@ class GtfsStaticRepo @Inject constructor(
     private fun isoDow(d: DayOfWeek): Int = d.value
 
     private fun prefsKeyLastRefresh(a: Agency) = "gtfs.last_refresh.${a.operatorId}"
-
-    private fun List<Pair<Station, Double>?>.filterNotNull(): List<Pair<Station, Double>> =
-        this.mapNotNull { it }
 
     private fun boundingBox(c: LatLng, milesRadius: Double): Box {
         val latDelta = milesRadius / 69.0
